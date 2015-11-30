@@ -1,0 +1,13 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item android:id="@+id/salvarContato"
+        android:title="@string/save_title"
+        android:icon="@drawable/ic_action_accept"
+        app:showAsAction="always" />
+    <item android:id="@+id/delContato"
+        android:title="@string/del_title"
+        android:icon="@drawable/ic_action_discard"
+        app:showAsAction="always" />
+
+</menu>

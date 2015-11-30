@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Agenda2015</string>
+
+    <string name="hello_world">Hello world!</string>
+    <string name="action_settings">Configuracoes</string>
+    <string name="del_title">Remover Contato</string>
+    <string name="exc_title">Excluir</string>
+    <string name="save_title">Salvar</string>
+    <string name="title_activity_detalhe">DetalheActivity</string>
+    <string name="string_hint">Buscar Contato</string>
+</resources>
