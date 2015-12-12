@@ -21,6 +21,9 @@ import android.support.v7.widget.SearchView;
 import android.widget.Toast;
 import android.support.v7.widget.Toolbar;
 
+import com.firebase.client.Firebase;
+import com.firebase.client.Query;
+
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -28,8 +31,10 @@ import java.util.List;
 
 import br.edu.ifspsaocarlos.sdm.agenda2015.R;
 import br.edu.ifspsaocarlos.sdm.agenda2015.adapter.ContatoArrayAdapter;
+import br.edu.ifspsaocarlos.sdm.agenda2015.adapter.ContatoFBAdapter;
 import br.edu.ifspsaocarlos.sdm.agenda2015.data.ContatoDAO;
 import br.edu.ifspsaocarlos.sdm.agenda2015.model.Contato;
+import br.edu.ifspsaocarlos.sdm.agenda2015.utils.Constants;
 
 public class BaseActivity extends AppCompatActivity {
 
@@ -37,12 +42,18 @@ public class BaseActivity extends AppCompatActivity {
 
     private ContatoDAO cDAO = new ContatoDAO(this);
     public ListView list;
-    public ContatoArrayAdapter adapter;
+    //public ContatoArrayAdapter adapter;
     protected SearchView searchView;
+    protected Firebase mFirebaseRef;
+    protected ContatoFBAdapter mAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        Firebase.setAndroidContext(this);
+        mFirebaseRef = new Firebase(Constants.FIREBASE_URL);
+
         setContentView(R.layout.activity_main);
 
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
@@ -57,7 +68,8 @@ public class BaseActivity extends AppCompatActivity {
                                     long arg3) {
                 Contato contact = (Contato) adapterView.getAdapter().getItem(arg2);
                 Intent inte = new Intent(getApplicationContext(), DetalheActivity.class);
-                inte.putExtra("contato", contact);
+                //inte.putExtra("contato", contact);
+                inte.putExtra("FirebaseID", mAdapter.getRef(arg2).getKey());
                 startActivityForResult(inte, 0);
             }
         });
@@ -141,11 +153,14 @@ public class BaseActivity extends AppCompatActivity {
     @Override
     public boolean onContextItemSelected(MenuItem item) {
         AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
-        ContatoArrayAdapter adapter = (ContatoArrayAdapter) list.getAdapter();
-        Contato contact = adapter.getItem(info.position);
+        ContatoFBAdapter adapter = (ContatoFBAdapter) list.getAdapter();
+        String FirebaseID = adapter.getRef(info.position).getKey().toString();
+        //ContatoArrayAdapter adapter = (ContatoArrayAdapter) list.getAdapter();
+        //Contato contact = adapter.getItem(info.position);
         switch(item.getItemId()){
             case R.id.delete_item:
-                cDAO.deleteContact(contact);
+                mFirebaseRef.child(FirebaseID).removeValue();
+                //cDAO.deleteContact(contact);
                 Toast.makeText(getApplicationContext(), "Removido com sucesso", Toast.LENGTH_SHORT).show();
                 buildListView();
                 return true;
@@ -154,20 +169,24 @@ public class BaseActivity extends AppCompatActivity {
     }
 
     protected void buildListView() {
-        List<Contato> values = cDAO.selecionaTodosContatosDB();
-        adapter = new ContatoArrayAdapter(this, values);
-        list.setAdapter(adapter);
+        //List<Contato> values = cDAO.selecionaTodosContatosDB();
+        //mAdapter = new ContatoArrayAdapter(this, values);
+        mAdapter = new ContatoFBAdapter(this, mFirebaseRef);
+        list.setAdapter(mAdapter);
     }
 
     protected void buildSearchListView(String query){
-        List<Contato> values = new ArrayList<Contato>();
+        //List<Contato> values = new ArrayList<Contato>();
         if (query.isEmpty()) {
-            values = cDAO.selecionaTodosContatosDB();
+            //values = cDAO.selecionaTodosContatosDB();
+            mAdapter = new ContatoFBAdapter(this,mFirebaseRef);
         }else {
-            values = cDAO.selecionaContatoDB(query);
+            //values = cDAO.selecionaContatoDB(query);
+            Query fbQuery = null;
+            mAdapter = new ContatoFBAdapter(this,fbQuery);
         }
-        adapter = new ContatoArrayAdapter(this,values);
-        list.setAdapter(adapter);
+        //mAdapter = new ContatoArrayAdapter(this,values);
+        list.setAdapter(mAdapter);
     }
 
 
