@@ -78,7 +78,7 @@ public class EquipContatoProvider {
 
         Cursor cursor  = context.getContentResolver().query(fonesContato, projecao, whereClause, null, null);
 
-        searchAtributes(cursor, idContato, SQLiteHelper.KEY_FONE, attrs);
+        searchAtributes(cursor, idContato, AtributesProvider.Atributos.KEY_FONE, attrs);
 
     }
 
@@ -91,7 +91,7 @@ public class EquipContatoProvider {
         Cursor cursor = context.getContentResolver().query(emailsContato, projecao, whereClause, null, null);
 
 
-        searchAtributes(cursor, idContato, SQLiteHelper.KEY_FONE, attrs);
+        searchAtributes(cursor, idContato, AtributesProvider.Atributos.KEY_FONE, attrs);
 
     }
 

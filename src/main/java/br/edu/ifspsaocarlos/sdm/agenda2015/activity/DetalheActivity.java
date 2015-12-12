@@ -22,6 +22,7 @@ import br.edu.ifspsaocarlos.sdm.agenda2015.data.ContatoDAO;
 import br.edu.ifspsaocarlos.sdm.agenda2015.data.SQLiteHelper;
 import br.edu.ifspsaocarlos.sdm.agenda2015.model.Atributo;
 import br.edu.ifspsaocarlos.sdm.agenda2015.model.Contato;
+import br.edu.ifspsaocarlos.sdm.agenda2015.provider.AtributesProvider;
 
 public class DetalheActivity extends AppCompatActivity implements DatePickerFragment.DateListerner{
 
@@ -100,8 +101,8 @@ public class DetalheActivity extends AppCompatActivity implements DatePickerFrag
             c.setNome(name);
             c.setFormattedDtNasc(dateNasc);
             c = cDAO.createContact(c);
-            c.addAttr(cDAO.createAttr(new Atributo(c.getId(), SQLiteHelper.KEY_FONE, fone)));
-            c.addAttr(cDAO.createAttr(new Atributo(c.getId(), SQLiteHelper.KEY_EMAIL, email)));
+            c.addAttr(cDAO.createAttr(new Atributo(c.getId(), AtributesProvider.Atributos.KEY_FONE, fone)));
+            c.addAttr(cDAO.createAttr(new Atributo(c.getId(), AtributesProvider.Atributos.KEY_EMAIL, email)));
             Toast.makeText(this, "Incluído com sucesso", Toast.LENGTH_SHORT).show();
         }  else {
 

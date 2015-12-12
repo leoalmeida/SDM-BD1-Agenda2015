@@ -11,6 +11,7 @@ import java.util.ListIterator;
 import java.util.Locale;
 
 import br.edu.ifspsaocarlos.sdm.agenda2015.data.SQLiteHelper;
+import br.edu.ifspsaocarlos.sdm.agenda2015.provider.AtributesProvider;
 
 /**
  * Created by LeonardoAlmeida on 30/10/15.
@@ -117,7 +118,7 @@ public class Contato implements Serializable{
         String retorno = "";
         while (iterator.hasNext()){
             Atributo attr = iterator.next();
-            if (attr.getAttrType().equals(SQLiteHelper.KEY_FONE)) {
+            if (attr.getAttrType().equals(AtributesProvider.Atributos.KEY_FONE)) {
                 if (!retorno.isEmpty()) retorno = retorno.concat("/");
                 retorno = retorno.concat(attr.getAttrValue());
             }
@@ -133,7 +134,7 @@ public class Contato implements Serializable{
         String retorno = "";
         while (iterator.hasNext()){
             Atributo attr = iterator.next();
-            if (attr.getAttrType().equals(SQLiteHelper.KEY_EMAIL)) {
+            if (attr.getAttrType().equals(AtributesProvider.Atributos.KEY_EMAIL)) {
                 if (!retorno.isEmpty()) retorno = retorno.concat("/");
                 retorno = retorno.concat(attr.getAttrValue());
             }
