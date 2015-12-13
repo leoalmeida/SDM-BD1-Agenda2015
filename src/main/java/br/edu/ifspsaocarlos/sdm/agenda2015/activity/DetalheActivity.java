@@ -1,68 +1,95 @@
 package br.edu.ifspsaocarlos.sdm.agenda2015.activity;
 
 import android.content.Intent;
+import android.os.Bundle;
+import android.provider.ContactsContract;
 import android.support.v4.app.DialogFragment;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
-import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
-import android.widget.CalendarView;
 import android.widget.EditText;
-import android.widget.TextView;
 import android.widget.Toast;
 
-import java.util.Calendar;
-import java.util.Date;
+import com.firebase.client.DataSnapshot;
+import com.firebase.client.Firebase;
+import com.firebase.client.FirebaseError;
+import com.firebase.client.ValueEventListener;
 
 import br.edu.ifspsaocarlos.sdm.agenda2015.R;
-import br.edu.ifspsaocarlos.sdm.agenda2015.data.ContatoDAO;
-import br.edu.ifspsaocarlos.sdm.agenda2015.data.SQLiteHelper;
-import br.edu.ifspsaocarlos.sdm.agenda2015.model.Atributo;
-import br.edu.ifspsaocarlos.sdm.agenda2015.model.Contato;
-import br.edu.ifspsaocarlos.sdm.agenda2015.provider.AtributesProvider;
+import br.edu.ifspsaocarlos.sdm.agenda2015.model.FBAtributo;
+import br.edu.ifspsaocarlos.sdm.agenda2015.model.FBContato;
+import br.edu.ifspsaocarlos.sdm.agenda2015.utils.Constants;
 
 public class DetalheActivity extends AppCompatActivity implements DatePickerFragment.DateListerner{
 
-    private Contato c;
-    private ContatoDAO cDAO;
+    private FBContato contato;
     private Button dtNasc;
+    private String firebaseID;
+    private Firebase mFireBaseRef;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_detalhe);
+
+        Firebase.setAndroidContext(this);
+        mFireBaseRef = new Firebase(Constants.FIREBASE_URL);
+
+
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
         dtNasc = (Button) findViewById(R.id.dtNasc);
 
-        if (getIntent().hasExtra("contato")){
-            this.c = (Contato) getIntent().getSerializableExtra("contato");
-            EditText nameText = (EditText) findViewById(R.id.nome);
-            nameText.setText(c.getNome());
-            EditText foneText = (EditText) findViewById(R.id.fone);
-            foneText.setText(c.listFones());
-            EditText mailText = (EditText) findViewById(R.id.email);
-            mailText.setText(c.listEmails());
+        if (getIntent().hasExtra("FirebaseID")){
 
-            dtNasc.setText(c.getFormattedDtNasc());
+            firebaseID = getIntent().getStringExtra("FirebaseID");
+            Firebase refContato = mFireBaseRef.child(firebaseID);
 
-            int pos =c.getNome().indexOf(" ");
-            if (pos==-1)
-                pos=c.getNome().length();
-            setTitle(c.getNome().substring(0,pos));
+            ValueEventListener refContatoListener = refContato.addValueEventListener(new ValueEventListener() {
+                @Override
+                public void onDataChange(DataSnapshot dataSnapshot) {
+                    contato = dataSnapshot.getValue(FBContato.class);
+
+                    if (contato != null) {
+
+                        EditText nameText = (EditText) findViewById(R.id.nome);
+                        nameText.setText(contato.getNome());
+
+                        EditText foneText = (EditText) findViewById(R.id.fone);
+                        foneText.setText(contato.listaFones());
+
+                        EditText mailText = (EditText) findViewById(R.id.email);
+                        mailText.setText(contato.listaEmails());
+
+                        dtNasc.setText(contato.getFormattedDtNasc());
+
+                        int pos = contato.getNome().indexOf(" ");
+                        if (pos == -1)
+                            pos = contato.getNome().length();
+                        setTitle(contato.getNome().substring(0, pos));
+                    }
+                }
+
+                @Override
+                public void onCancelled(FirebaseError firebaseError) {
+                    Log.e("LOG", firebaseError.getMessage());
+                }
+            });
+
+
         }
-        cDAO = new ContatoDAO(this);
     }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.menu_detalhe, menu);
-        if(!getIntent().hasExtra("contato")){
+        if(firebaseID == null){
             MenuItem item = menu.findItem(R.id.delContato);
             item.setVisible(false);
         }
@@ -79,10 +106,8 @@ public class DetalheActivity extends AppCompatActivity implements DatePickerFrag
                  salvar();
                  return true;
              case R.id.delContato:
-                 cDAO.deleteContact(c);
+                 mFireBaseRef.child(firebaseID).removeValue();
                  Toast.makeText(getApplicationContext(),"Removido com sucesso",Toast.LENGTH_SHORT).show();
-                 Intent resultIntent = new Intent();
-                 setResult(RESULT_OK, resultIntent);
                  finish();
                  return true;
              default:
@@ -96,20 +121,24 @@ public class DetalheActivity extends AppCompatActivity implements DatePickerFrag
         String dateNasc = ((Button) findViewById(R.id.dtNasc)).getText().toString();
         String fone = ((EditText) findViewById(R.id.fone)).getText().toString();
         String email = ((EditText) findViewById(R.id.email)).getText().toString();
-        if (c==null){
-            c = new Contato();
-            c.setNome(name);
-            c.setFormattedDtNasc(dateNasc);
-            c = cDAO.createContact(c);
-            c.addAttr(cDAO.createAttr(new Atributo(c.getId(), AtributesProvider.Atributos.KEY_FONE, fone)));
-            c.addAttr(cDAO.createAttr(new Atributo(c.getId(), AtributesProvider.Atributos.KEY_EMAIL, email)));
+
+        if (contato==null){
+            contato = new FBContato();
+            contato.setNome(name);
+            contato.setFormattedDtNasc(dateNasc);
+            contato.addAttr(new FBAtributo(email,  ContactsContract.CommonDataKinds.Email.TYPE_HOME, ContactsContract.CommonDataKinds.Email.LABEL, ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE));
+            contato.addAttr(new FBAtributo(fone,  ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE, ContactsContract.CommonDataKinds.Phone.LABEL, ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE));
+
+            mFireBaseRef.push().setValue(contato);
+
             Toast.makeText(this, "Incluído com sucesso", Toast.LENGTH_SHORT).show();
         }  else {
 
-            c.setNome(name);
-            c.setFormattedDtNasc(dateNasc);
-            cDAO.updateContact(c);
-            cDAO.updateAttrs(c.getAtributos());
+            contato.setNome(name);
+            contato.setFormattedDtNasc(dateNasc);
+
+            mFireBaseRef.child(firebaseID).setValue(contato);
+
             Toast.makeText(this, "Alterado com sucesso", Toast.LENGTH_SHORT).show();
         }
         Intent resultIntent = new Intent();
@@ -126,4 +155,5 @@ public class DetalheActivity extends AppCompatActivity implements DatePickerFrag
     public void onReturnDate(String date) {
         dtNasc.setText(date);
     }
+
 }

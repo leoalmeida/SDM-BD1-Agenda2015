@@ -3,12 +3,17 @@ package br.edu.ifspsaocarlos.sdm.agenda2015.activity;
 import android.app.SearchManager;
 import android.content.Context;
 import android.content.Intent;
-//import android.support.design.widget;
+import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.provider.CallLog;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
+import android.support.v7.widget.SearchView;
+import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.ContextMenu;
 import android.view.Menu;
@@ -17,35 +22,37 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ListView;
-import android.support.v7.widget.SearchView;
 import android.widget.Toast;
-import android.support.v7.widget.Toolbar;
 
 import com.firebase.client.Firebase;
 import com.firebase.client.Query;
 
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
+import java.util.Iterator;
 
 import br.edu.ifspsaocarlos.sdm.agenda2015.R;
-import br.edu.ifspsaocarlos.sdm.agenda2015.adapter.ContatoArrayAdapter;
 import br.edu.ifspsaocarlos.sdm.agenda2015.adapter.ContatoFBAdapter;
-import br.edu.ifspsaocarlos.sdm.agenda2015.data.ContatoDAO;
-import br.edu.ifspsaocarlos.sdm.agenda2015.model.Contato;
+import br.edu.ifspsaocarlos.sdm.agenda2015.model.FBContato;
+import br.edu.ifspsaocarlos.sdm.agenda2015.provider.EquipContatoProvider;
 import br.edu.ifspsaocarlos.sdm.agenda2015.utils.Constants;
+
 
 public class BaseActivity extends AppCompatActivity {
 
     private static final String TAG = "BaseActivity";
 
-    private ContatoDAO cDAO = new ContatoDAO(this);
     public ListView list;
-    //public ContatoArrayAdapter adapter;
     protected SearchView searchView;
     protected Firebase mFirebaseRef;
     protected ContatoFBAdapter mAdapter;
+
+    private EquipContatoProvider provider;
+
+    public enum AppStart {
+        FIRST_TIME, FIRST_TIME_VERSION, NORMAL;
+    }
+    private static final String LAST_APP_VERSION = "last_app_version";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,21 +61,25 @@ public class BaseActivity extends AppCompatActivity {
         Firebase.setAndroidContext(this);
         mFirebaseRef = new Firebase(Constants.FIREBASE_URL);
 
+        provider = new EquipContatoProvider(this);
+
+        if (checkAppStart() == AppStart.FIRST_TIME) {
+            startContactList();
+        }
+
         setContentView(R.layout.activity_main);
 
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-        //verifyCallList();
 
         list = (ListView) findViewById(R.id.listView);
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View arg1, int arg2,
                                     long arg3) {
-                Contato contact = (Contato) adapterView.getAdapter().getItem(arg2);
+                //FBContato contact = (FBContato) adapterView.getAdapter().getItem(arg2);
                 Intent inte = new Intent(getApplicationContext(), DetalheActivity.class);
-                //inte.putExtra("contato", contact);
                 inte.putExtra("FirebaseID", mAdapter.getRef(arg2).getKey());
                 startActivityForResult(inte, 0);
             }
@@ -77,6 +88,8 @@ public class BaseActivity extends AppCompatActivity {
         registerForContextMenu(list);
 
     }
+
+
 
     private void verifyCallList() {
         Uri ligacoes = CallLog.Calls.CONTENT_URI;
@@ -125,7 +138,7 @@ public class BaseActivity extends AppCompatActivity {
             lig.close();
 
         }catch (SecurityException e){
-            Log.d(this.TAG, e.toString());
+            Log.d(TAG, e.toString());
         }
     }
 
@@ -155,12 +168,9 @@ public class BaseActivity extends AppCompatActivity {
         AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
         ContatoFBAdapter adapter = (ContatoFBAdapter) list.getAdapter();
         String FirebaseID = adapter.getRef(info.position).getKey().toString();
-        //ContatoArrayAdapter adapter = (ContatoArrayAdapter) list.getAdapter();
-        //Contato contact = adapter.getItem(info.position);
         switch(item.getItemId()){
             case R.id.delete_item:
                 mFirebaseRef.child(FirebaseID).removeValue();
-                //cDAO.deleteContact(contact);
                 Toast.makeText(getApplicationContext(), "Removido com sucesso", Toast.LENGTH_SHORT).show();
                 buildListView();
                 return true;
@@ -169,24 +179,65 @@ public class BaseActivity extends AppCompatActivity {
     }
 
     protected void buildListView() {
-        //List<Contato> values = cDAO.selecionaTodosContatosDB();
-        //mAdapter = new ContatoArrayAdapter(this, values);
         mAdapter = new ContatoFBAdapter(this, mFirebaseRef);
         list.setAdapter(mAdapter);
     }
 
     protected void buildSearchListView(String query){
-        //List<Contato> values = new ArrayList<Contato>();
         if (query.isEmpty()) {
-            //values = cDAO.selecionaTodosContatosDB();
             mAdapter = new ContatoFBAdapter(this,mFirebaseRef);
         }else {
-            //values = cDAO.selecionaContatoDB(query);
             Query fbQuery = null;
             mAdapter = new ContatoFBAdapter(this,fbQuery);
         }
-        //mAdapter = new ContatoArrayAdapter(this,values);
         list.setAdapter(mAdapter);
+    }
+
+    private void startContactList () {
+        Iterator<FBContato> listIterator = provider.selecionaTodosContatosAparelho().iterator();
+        while (listIterator.hasNext()) {
+            FBContato contato = listIterator.next();
+
+            mFirebaseRef.push().setValue(contato);
+
+        }
+    }
+
+    public AppStart checkAppStart() {
+        PackageInfo pInfo;
+        SharedPreferences sharedPreferences = PreferenceManager
+                .getDefaultSharedPreferences(this);
+        AppStart appStart = AppStart.NORMAL;
+        try {
+            pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
+            int lastVersionCode = sharedPreferences
+                    .getInt(LAST_APP_VERSION, -1);
+            int currentVersionCode = pInfo.versionCode;
+            appStart = checkAppStart(currentVersionCode, lastVersionCode);
+            // Update version in preferences
+            sharedPreferences.edit()
+                    .putInt(LAST_APP_VERSION, currentVersionCode).commit();
+        } catch (PackageManager.NameNotFoundException e) {
+            Log.w(Constants.LOG,
+                    "Unable to determine current app version from pacakge manager. Defenisvely assuming normal app start.");
+        }
+        return appStart;
+    }
+
+    public AppStart checkAppStart(int currentVersionCode, int lastVersionCode) {
+        if (lastVersionCode == -1) {
+            return AppStart.FIRST_TIME;
+        } else if (lastVersionCode < currentVersionCode) {
+            return AppStart.FIRST_TIME_VERSION;
+        } else if (lastVersionCode > currentVersionCode) {
+            Log.w(Constants.LOG, "Current version code (" + currentVersionCode
+                    + ") is less then the one recognized on last startup ("
+                    + lastVersionCode
+                    + "). Defenisvely assuming normal app start.");
+            return AppStart.NORMAL;
+        } else {
+            return AppStart.NORMAL;
+        }
     }
 
 

@@ -8,4 +8,6 @@
     <string name="save_title">Salvar</string>
     <string name="title_activity_detalhe">DetalheActivity</string>
     <string name="string_hint">Buscar Contato</string>
+    <string name="dtnascLabel">Nascimento: </string>
+    <string name="fonesLabel">Fones: </string>
 </resources>

@@ -48,14 +48,6 @@
         </activity>
         <activity android:name=".activity.BaseActivity" />
 
-        <provider
-            android:name=".provider.ContatoProvider"
-            android:authorities="br.edu.ifspsaocarlos.provider"
-            android:exported="true" />
-        <provider
-            android:name=".provider.AtributesProvider"
-            android:authorities="br.edu.ifspsaocarlos.provider"
-            android:exported="true" />
     </application>
 
 </manifest>
