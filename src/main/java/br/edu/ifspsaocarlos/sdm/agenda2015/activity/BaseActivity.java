@@ -1,5 +1,6 @@
 package br.edu.ifspsaocarlos.sdm.agenda2015.activity;
 
+import android.app.ProgressDialog;
 import android.app.SearchManager;
 import android.content.Context;
 import android.content.Intent;
@@ -14,40 +15,90 @@ import android.provider.CallLog;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.SearchView;
 import android.support.v7.widget.Toolbar;
-import android.util.Log;
 import android.view.ContextMenu;
+import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.View.OnKeyListener;
 import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemClickListener;
+import android.widget.AdapterView.OnItemLongClickListener;
 import android.widget.ListView;
 import android.widget.Toast;
 
+import com.couchbase.lite.Database;
+import com.couchbase.lite.Document;
+import com.couchbase.lite.Emitter;
+import com.couchbase.lite.LiveQuery;
+import com.couchbase.lite.Manager;
+import com.couchbase.lite.Mapper;
+import com.couchbase.lite.QueryRow;
+import com.couchbase.lite.android.AndroidContext;
+import com.couchbase.lite.replicator.Replication;
+import com.couchbase.lite.util.Log;
+import com.firebase.client.ChildEventListener;
+import com.firebase.client.DataSnapshot;
 import com.firebase.client.Firebase;
+import com.firebase.client.FirebaseError;
 import com.firebase.client.Query;
 
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
+import java.util.GregorianCalendar;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
+import java.util.UUID;
 
 import br.edu.ifspsaocarlos.sdm.agenda2015.R;
 import br.edu.ifspsaocarlos.sdm.agenda2015.adapter.ContatoFBAdapter;
+import br.edu.ifspsaocarlos.sdm.agenda2015.adapter.CouchSyncArrayAdapter;
 import br.edu.ifspsaocarlos.sdm.agenda2015.model.FBContato;
 import br.edu.ifspsaocarlos.sdm.agenda2015.provider.EquipContatoProvider;
 import br.edu.ifspsaocarlos.sdm.agenda2015.utils.Constants;
 
 
-public class BaseActivity extends AppCompatActivity {
+public class BaseActivity extends AppCompatActivity implements Replication.ChangeListener,
+        OnItemClickListener, OnItemLongClickListener, OnKeyListener{
 
-    private static final String TAG = "BaseActivity";
+    public static String TAG = "Agenda2015";
 
+
+    //Main Screen
     public ListView list;
     protected SearchView searchView;
-    protected Firebase mFirebaseRef;
-    protected ContatoFBAdapter mAdapter;
-
     private EquipContatoProvider provider;
+
+    //Firebase sync
+    protected Firebase mFirebaseRef;
+    protected ContatoFBAdapter syncAdapter;
+
+    //couch internals
+    protected static Manager manager;
+    private Database database;
+    private LiveQuery liveQuery;
+    protected CouchSyncArrayAdapter localAdapter;
+
+    @Override
+    public void changed(Replication.ChangeEvent event) {
+
+    }
+
+    @Override
+    public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
+        return false;
+    }
+
+    @Override
+    public boolean onKey(View v, int keyCode, KeyEvent event) {
+        return false;
+    }
 
     public enum AppStart {
         FIRST_TIME, FIRST_TIME_VERSION, NORMAL;
@@ -72,24 +123,21 @@ public class BaseActivity extends AppCompatActivity {
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
+        try {
+            startCBLite();
+        } catch (Exception e) {
+            Toast.makeText(getApplicationContext(), "Error Initializing CBLIte, see logs for details", Toast.LENGTH_LONG).show();
+            Log.e(TAG, "Error initializing CBLite", e);
+        }
+
+
 
         list = (ListView) findViewById(R.id.listView);
-        list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> adapterView, View arg1, int arg2,
-                                    long arg3) {
-                //FBContato contact = (FBContato) adapterView.getAdapter().getItem(arg2);
-                Intent inte = new Intent(getApplicationContext(), DetalheActivity.class);
-                inte.putExtra("FirebaseID", mAdapter.getRef(arg2).getKey());
-                startActivityForResult(inte, 0);
-            }
-        });
+        list.setOnItemClickListener(this);
 
         registerForContextMenu(list);
 
     }
-
-
 
     private void verifyCallList() {
         Uri ligacoes = CallLog.Calls.CONTENT_URI;
@@ -142,6 +190,17 @@ public class BaseActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Handle click on item in list
+     */
+    @Override
+    public void onItemClick(AdapterView<?> adapterView, View view, int position, long id) {
+        //FBContato contact = (FBContato) adapterView.getAdapter().getItem(arg2);
+        Intent inte = new Intent(getApplicationContext(), DetalheActivity.class);
+        inte.putExtra("DocumentID", localAdapter.getItem(position).getDocumentId());
+        startActivityForResult(inte, 0);
+    }
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
@@ -166,11 +225,21 @@ public class BaseActivity extends AppCompatActivity {
     @Override
     public boolean onContextItemSelected(MenuItem item) {
         AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
-        ContatoFBAdapter adapter = (ContatoFBAdapter) list.getAdapter();
-        String FirebaseID = adapter.getRef(info.position).getKey().toString();
+        //ContatoFBAdapter adapter = (ContatoFBAdapter) list.getAdapter();
+        CouchSyncArrayAdapter adapter = (CouchSyncArrayAdapter) list.getAdapter();
         switch(item.getItemId()){
             case R.id.delete_item:
-                mFirebaseRef.child(FirebaseID).removeValue();
+                //mFirebaseRef.child(FirebaseID).removeValue();
+                Document document = adapter.getItem(info.position).getDocument();
+
+                try {
+                    document.delete();
+                    syncAdapter.notifyDataSetChanged();
+                } catch (Exception e) {
+                    Toast.makeText(getApplicationContext(), "Error updating database, see logs for details", Toast.LENGTH_LONG).show();
+                    Log.e(TAG, "Error updating database", e);
+                }
+
                 Toast.makeText(getApplicationContext(), "Removido com sucesso", Toast.LENGTH_SHORT).show();
                 buildListView();
                 return true;
@@ -178,19 +247,38 @@ public class BaseActivity extends AppCompatActivity {
         return super.onContextItemSelected(item);
     }
 
+    protected Document buildUpdateListView(String documentID) {
+        //syncAdapter = new ContatoFBAdapter(this, mFirebaseRef);
+        //list.setAdapter(syncAdapter);
+        Document document;
+        if (documentID == null) {
+            document = database.getDocument(documentID);
+        }else {
+            document = database.createDocument();
+        }
+
+        initItemListAdapter();
+
+        return document;
+    }
+
     protected void buildListView() {
-        mAdapter = new ContatoFBAdapter(this, mFirebaseRef);
-        list.setAdapter(mAdapter);
+        //syncAdapter = new ContatoFBAdapter(this, mFirebaseRef);
+        //list.setAdapter(syncAdapter);
+        initItemListAdapter();
     }
 
     protected void buildSearchListView(String query){
         if (query.isEmpty()) {
-            mAdapter = new ContatoFBAdapter(this,mFirebaseRef);
+            //syncAdapter = new ContatoFBAdapter(this,mFirebaseRef);
+            initItemListAdapter();
         }else {
-            Query fbQuery = null;
-            mAdapter = new ContatoFBAdapter(this,fbQuery);
+            //syncAdapter = new ContatoFBAdapter(this,fbQuery);
+
+            initItemListAdapter();
         }
-        list.setAdapter(mAdapter);
+        //list.setAdapter(syncAdapter);
+
     }
 
     private void startContactList () {
@@ -198,7 +286,7 @@ public class BaseActivity extends AppCompatActivity {
         while (listIterator.hasNext()) {
             FBContato contato = listIterator.next();
 
-            mFirebaseRef.push().setValue(contato);
+            //mFirebaseRef.push().setValue(contato);
 
         }
     }
@@ -238,6 +326,112 @@ public class BaseActivity extends AppCompatActivity {
         } else {
             return AppStart.NORMAL;
         }
+    }
+
+
+    protected void startCBLite() throws Exception {
+
+        Manager.enableLogging(TAG, Log.VERBOSE);
+        Manager.enableLogging(Log.TAG, Log.VERBOSE);
+        Manager.enableLogging(Log.TAG_SYNC_ASYNC_TASK, Log.VERBOSE);
+        Manager.enableLogging(Log.TAG_SYNC, Log.VERBOSE);
+        Manager.enableLogging(Log.TAG_QUERY, Log.VERBOSE);
+        Manager.enableLogging(Log.TAG_VIEW, Log.VERBOSE);
+        Manager.enableLogging(Log.TAG_DATABASE, Log.VERBOSE);
+
+        manager = new Manager(new AndroidContext(this), Manager.DEFAULT_OPTIONS);
+
+        //install a view definition needed by the application
+        database = manager.getDatabase(Constants.CDB_NAME);
+        com.couchbase.lite.View viewItemsByDate = database.getView(String.format("%s/%s", Constants.designDocName, Constants.byDateViewName));
+        viewItemsByDate.setMap(new Mapper() {
+            @Override
+            public void map(Map<String, Object> document, Emitter emitter) {
+                Object createdAt = document.get("created_at");
+                if (createdAt != null) {
+                    emitter.emit(createdAt.toString(), null);
+                }
+            }
+        }, "1.0");
+
+        initItemListAdapter();
+
+        startLiveQuery(viewItemsByDate);
+
+        startSync();
+
+    }
+
+    private void initItemListAdapter() {
+        localAdapter = new CouchSyncArrayAdapter(
+                getApplicationContext(),
+                R.layout.contato_celula,
+                R.id.nome,
+                new ArrayList<QueryRow>()
+        );
+        list.setAdapter(localAdapter);
+        list.setOnItemClickListener(BaseActivity.this);
+        list.setOnItemLongClickListener(BaseActivity.this);
+    }
+
+    private void startLiveQuery(com.couchbase.lite.View view) throws Exception {
+
+        final ProgressDialog progressDialog = showLoadingSpinner();
+
+        if (liveQuery == null) {
+
+            liveQuery = view.createQuery().toLiveQuery();
+
+            liveQuery.addChangeListener(new LiveQuery.ChangeListener() {
+                public void changed(final LiveQuery.ChangeEvent event) {
+                    runOnUiThread(new Runnable() {
+                        public void run() {
+                            localAdapter.clear();
+                            for (Iterator<QueryRow> it = event.getRows(); it.hasNext();) {
+                                localAdapter.add(it.next());
+                            }
+                            localAdapter.notifyDataSetChanged();
+                            progressDialog.dismiss();
+                        }
+                    });
+                }
+            });
+
+            liveQuery.start();
+
+        }
+
+    }
+
+    private ProgressDialog showLoadingSpinner() {
+        ProgressDialog progress = new ProgressDialog(this);
+        progress.setTitle("Loading");
+        progress.setMessage("Wait while loading...");
+        progress.show();
+        return progress;
+    }
+
+    private void startSync() {
+
+        URL syncUrl;
+        try {
+            syncUrl = new URL(Constants.FIREBASE_URL);
+        } catch (MalformedURLException e) {
+            throw new RuntimeException(e);
+        }
+
+        Replication pullReplication = database.createPullReplication(syncUrl);
+        pullReplication.setContinuous(true);
+
+        Replication pushReplication = database.createPushReplication(syncUrl);
+        pushReplication.setContinuous(true);
+
+        pullReplication.start();
+        pushReplication.start();
+
+        pullReplication.addChangeListener(this);
+        pushReplication.addChangeListener(this);
+
     }
 
 
