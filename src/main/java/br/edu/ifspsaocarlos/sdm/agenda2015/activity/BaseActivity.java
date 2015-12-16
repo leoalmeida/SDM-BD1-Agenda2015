@@ -21,11 +21,16 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
+import android.widget.ListAdapter;
 import android.widget.ListView;
 import android.widget.Toast;
 
+import com.firebase.client.ChildEventListener;
+import com.firebase.client.DataSnapshot;
 import com.firebase.client.Firebase;
+import com.firebase.client.FirebaseError;
 import com.firebase.client.Query;
+import com.firebase.client.ValueEventListener;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -44,7 +49,8 @@ public class BaseActivity extends AppCompatActivity {
 
     public ListView list;
     protected SearchView searchView;
-    protected Firebase mFirebaseRef;
+    protected Firebase refFirebase;
+    protected Query refQuery;
     protected ContatoFBAdapter mAdapter;
 
     private EquipContatoProvider provider;
@@ -59,7 +65,7 @@ public class BaseActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         Firebase.setAndroidContext(this);
-        mFirebaseRef = new Firebase(Constants.FIREBASE_URL);
+        refFirebase = new Firebase(Constants.FIREBASE_URL);
 
         provider = new EquipContatoProvider(this);
 
@@ -170,7 +176,7 @@ public class BaseActivity extends AppCompatActivity {
         String FirebaseID = adapter.getRef(info.position).getKey().toString();
         switch(item.getItemId()){
             case R.id.delete_item:
-                mFirebaseRef.child(FirebaseID).removeValue();
+                refFirebase.child(FirebaseID).removeValue();
                 Toast.makeText(getApplicationContext(), "Removido com sucesso", Toast.LENGTH_SHORT).show();
                 buildListView();
                 return true;
@@ -179,26 +185,43 @@ public class BaseActivity extends AppCompatActivity {
     }
 
     protected void buildListView() {
-        mAdapter = new ContatoFBAdapter(this, mFirebaseRef);
+        mAdapter = new ContatoFBAdapter(this, refFirebase);
         list.setAdapter(mAdapter);
     }
 
     protected void buildSearchListView(String query){
         if (query.isEmpty()) {
-            mAdapter = new ContatoFBAdapter(this,mFirebaseRef);
+            mAdapter = new ContatoFBAdapter(this, refFirebase);
         }else {
-            Query fbQuery = null;
-            mAdapter = new ContatoFBAdapter(this,fbQuery);
+            refQuery = refFirebase.orderByKey();
+            refQuery.addChildEventListener(new ChildEventListener() {
+                @Override
+                public void onChildAdded(DataSnapshot snapshot, String previousChildKey) {
+                    System.out.println("The " + snapshot.getKey() + " dinosaur's score is " + snapshot.getValue());
+                    list.getChildAt(snapshot.getKey()).setVisibility(View.INVISIBLE);
+                }
+                @Override
+                public void onChildChanged(DataSnapshot dataSnapshot, String s) {}
+                @Override
+                public void onChildRemoved(DataSnapshot dataSnapshot) {}
+                @Override
+                public void onChildMoved(DataSnapshot dataSnapshot, String s) {}
+                @Override
+                public void onCancelled(FirebaseError firebaseError) {}
+            });
+            mAdapter = new ContatoFBAdapter(this, refQuery);
         }
         list.setAdapter(mAdapter);
     }
 
     private void startContactList () {
         Iterator<FBContato> listIterator = provider.selecionaTodosContatosAparelho().iterator();
+
         while (listIterator.hasNext()) {
+
             FBContato contato = listIterator.next();
 
-            mFirebaseRef.push().setValue(contato);
+            refFirebase.push().setValue(contato);
 
         }
     }

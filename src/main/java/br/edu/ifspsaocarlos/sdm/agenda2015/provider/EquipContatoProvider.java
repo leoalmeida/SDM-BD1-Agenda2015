@@ -64,6 +64,7 @@ public class EquipContatoProvider {
                     contatosList.add(contato);
                 //}
                 cursor.moveToNext();
+                if (cursor.getPosition() > 20) break;
             }
             cursor.close();
         }
