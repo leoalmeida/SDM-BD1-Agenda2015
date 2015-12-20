@@ -1,6 +1,6 @@
 package br.edu.ifspsaocarlos.sdm.agenda2015.model;
 
-import android.net.Uri;
+import android.content.Context;
 import android.provider.ContactsContract;
 
 import java.text.ParseException;
@@ -9,6 +9,9 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+
+import br.edu.ifspsaocarlos.sdm.agenda2015.provider.ContactFakerProvider;
+import br.edu.ifspsaocarlos.sdm.agenda2015.utils.Constants;
 
 /**
  * Created by LeonardoAlmeida on 11/12/15.
@@ -75,6 +78,17 @@ public class FBContato {
     }
 
     //public List<FBAtributo>  listaEmails() {return atributos;}
+
+    public static FBContato genFakeContact(Context context){
+        FBContato contact = new FBContato();
+        contact.setNome(ContactFakerProvider.generatePropertyValue(ContactFakerProvider.PROPERTY.FINDNAME, context));
+        contact.setFormattedDtNasc(ContactFakerProvider.generatePropertyValue(ContactFakerProvider.DATE.PAST, context));
+        contact.setThumb_foto(ContactFakerProvider.generatePropertyValue(ContactFakerProvider.INTERNET.AVATAR, context));
+        contact.addAttr(FBAtributo.genFakeAttr(Constants.TYPE_FONE, context));
+        contact.addAttr(FBAtributo.genFakeAttr(Constants.TYPE_EMAIL, context));
+
+        return contact;
+    }
 
     public String listaFones() {
         Iterator<FBAtributo> iterator = atributos.listIterator();

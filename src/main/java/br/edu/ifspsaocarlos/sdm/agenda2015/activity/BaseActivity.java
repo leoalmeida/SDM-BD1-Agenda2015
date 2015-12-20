@@ -7,6 +7,8 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
@@ -21,16 +23,11 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
-import android.widget.ListAdapter;
 import android.widget.ListView;
 import android.widget.Toast;
 
-import com.firebase.client.ChildEventListener;
-import com.firebase.client.DataSnapshot;
 import com.firebase.client.Firebase;
-import com.firebase.client.FirebaseError;
 import com.firebase.client.Query;
-import com.firebase.client.ValueEventListener;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -67,6 +64,9 @@ public class BaseActivity extends AppCompatActivity {
         Firebase.setAndroidContext(this);
         refFirebase = new Firebase(Constants.FIREBASE_URL);
 
+
+        // Inicia lista com dados aleatorios para teste
+        //FBContato contato = FBContato.genFakeContact(this);
         provider = new EquipContatoProvider(this);
 
         if (checkAppStart() == AppStart.FIRST_TIME) {
@@ -93,59 +93,6 @@ public class BaseActivity extends AppCompatActivity {
 
         registerForContextMenu(list);
 
-    }
-
-
-
-    private void verifyCallList() {
-        Uri ligacoes = CallLog.Calls.CONTENT_URI;
-
-        String[] projecao =  new String[]{CallLog.Calls.NUMBER, CallLog.Calls.DURATION, CallLog.Calls.TYPE, CallLog.Calls.DATE};
-
-        try {
-
-            Cursor lig = getContentResolver().query(ligacoes, projecao, null, null, null);
-
-            if (lig == null) {
-                lig.moveToFirst();
-
-                while (!lig.isAfterLast()){
-
-                    String num = lig.getString(0);
-                    String duracao = lig.getString(1);
-                    String tipo = null;
-                    int typoCall = lig.getInt(2);
-                    switch (typoCall){
-                        case 1:
-                            tipo = "Recebida";
-                            break;
-                        case 2:
-                            tipo = "Efetuada";
-                            break;
-                        case 3:
-                            tipo = "Perdida";
-                            break;
-
-                    }
-
-                    Long data = lig.getLong(3);
-                    SimpleDateFormat format = new SimpleDateFormat("dd-MM-yy HH:mm");
-                    String dataLigacao = format.format(new Date(data));
-
-                    Log.d(TAG , "Numero:" + num);
-                    Log.d(TAG , "Duracao:" + duracao);
-                    Log.d(TAG , "Tipo:" + tipo);
-                    Log.d(TAG , "Data:" + dataLigacao);
-                    lig.moveToNext();
-
-                }
-            }
-
-            lig.close();
-
-        }catch (SecurityException e){
-            Log.d(TAG, e.toString());
-        }
     }
 
     @Override
@@ -184,48 +131,57 @@ public class BaseActivity extends AppCompatActivity {
         return super.onContextItemSelected(item);
     }
 
+    //Preeche lista da tela
     protected void buildListView() {
         mAdapter = new ContatoFBAdapter(this, refFirebase);
         list.setAdapter(mAdapter);
     }
 
+    //Preeche lista da tela com Filtro escolhido
     protected void buildSearchListView(String query){
         if (query.isEmpty()) {
             mAdapter = new ContatoFBAdapter(this, refFirebase);
         }else {
-            refQuery = refFirebase.orderByKey();
-            refQuery.addChildEventListener(new ChildEventListener() {
-                @Override
-                public void onChildAdded(DataSnapshot snapshot, String previousChildKey) {
-                    System.out.println("The " + snapshot.getKey() + " dinosaur's score is " + snapshot.getValue());
-                    list.getChildAt(snapshot.getKey()).setVisibility(View.INVISIBLE);
-                }
-                @Override
-                public void onChildChanged(DataSnapshot dataSnapshot, String s) {}
-                @Override
-                public void onChildRemoved(DataSnapshot dataSnapshot) {}
-                @Override
-                public void onChildMoved(DataSnapshot dataSnapshot, String s) {}
-                @Override
-                public void onCancelled(FirebaseError firebaseError) {}
-            });
+            refQuery = refFirebase.orderByChild(Constants.SEARCH_COLUMN).startAt(query);
             mAdapter = new ContatoFBAdapter(this, refQuery);
         }
         list.setAdapter(mAdapter);
     }
 
+
+    // Gera informacoes iniciais para o App em testes
     private void startContactList () {
+        //Teste utilizando contatos do telefone hospedeiro
         Iterator<FBContato> listIterator = provider.selecionaTodosContatosAparelho().iterator();
-
         while (listIterator.hasNext()) {
-
-            FBContato contato = listIterator.next();
-
-            refFirebase.push().setValue(contato);
-
+            // fetch data
+            int quant = 0;
+            while (quant < 20) {
+                FBContato contato = listIterator.next();
+                refFirebase.push().setValue(contato);
+                quant++;
+            }
         }
+
+        //Teste utilizando as informacoes coletadas do host faker
+        /*ConnectivityManager connMgr = (ConnectivityManager)
+                getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
+        if (networkInfo != null && networkInfo.isConnected()) {
+            // fetch data
+            int quant = 0;
+            while (quant<20) {
+                //FBContato contato = listIterator.next();
+                refFirebase.push().setValue(FBContato.genFakeContact(this));
+                quant++;
+            }
+        } else {
+            String msg = "Sem conexão com a internet";
+            Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_SHORT).show();
+        }*/
     }
 
+    //Verifica se e a primeira execucao do app
     public AppStart checkAppStart() {
         PackageInfo pInfo;
         SharedPreferences sharedPreferences = PreferenceManager
@@ -247,6 +203,7 @@ public class BaseActivity extends AppCompatActivity {
         return appStart;
     }
 
+    //Verifica a troca de versao do app
     public AppStart checkAppStart(int currentVersionCode, int lastVersionCode) {
         if (lastVersionCode == -1) {
             return AppStart.FIRST_TIME;

@@ -57,7 +57,8 @@ public class EquipContatoProvider {
                     FBContato contato = new FBContato();
                     contato.setNome(cursor.getString(1));
                     contato.setFormattedDtNasc("01/01/1970");
-                    contato.setThumb_foto(cursor.getString(3));
+                    //contato.setThumb_foto(cursor.getString(3));
+                    contato.setThumb_foto("");
                     buscaListaEmailsContato(cursor.getLong(0) ,contato.getAtributos());
                     buscaListaFonesContato(cursor.getLong(0), contato.getAtributos());
 
