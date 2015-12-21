@@ -15,6 +15,7 @@ import br.edu.ifspsaocarlos.sdm.agenda2015.model.FBContato;
 
 /**
  * Created by LeonardoAlmeida on 28/11/15.
+ * Classe responsavel pela busca de contatos no aparelho para utilizar como dados iniciais
  */
 public class EquipContatoProvider {
 

@@ -2,6 +2,7 @@ package br.edu.ifspsaocarlos.sdm.agenda2015.model;
 
 /**
  * Created by LeonardoAlmeida on 12/12/15.
+ * Classe de atribuição dos atributos da agenda
  */
 public class FBAtributo {
 

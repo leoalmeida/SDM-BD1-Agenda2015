@@ -44,7 +44,7 @@ public class BaseActivity extends AppCompatActivity {
 
     public ListView list;
     protected SearchView searchView;
-    protected Firebase mFirebaseRef;
+    protected Firebase refFirebase;
     protected ContatoFBAdapter mAdapter;
 
     private EquipContatoProvider provider;
@@ -59,7 +59,7 @@ public class BaseActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         Firebase.setAndroidContext(this);
-        mFirebaseRef = new Firebase(Constants.FIREBASE_URL);
+        refFirebase = new Firebase(Constants.FIREBASE_URL);
 
         provider = new EquipContatoProvider(this);
 
@@ -170,7 +170,7 @@ public class BaseActivity extends AppCompatActivity {
         String FirebaseID = adapter.getRef(info.position).getKey().toString();
         switch(item.getItemId()){
             case R.id.delete_item:
-                mFirebaseRef.child(FirebaseID).removeValue();
+                refFirebase.child(FirebaseID).removeValue();
                 Toast.makeText(getApplicationContext(), "Removido com sucesso", Toast.LENGTH_SHORT).show();
                 buildListView();
                 return true;
@@ -178,31 +178,42 @@ public class BaseActivity extends AppCompatActivity {
         return super.onContextItemSelected(item);
     }
 
-    protected void buildListView() {
-        mAdapter = new ContatoFBAdapter(this, mFirebaseRef);
-        list.setAdapter(mAdapter);
-    }
-
+    //Preeche lista da tela com Filtro escolhido
     protected void buildSearchListView(String query){
         if (query.isEmpty()) {
-            mAdapter = new ContatoFBAdapter(this,mFirebaseRef);
+            Query fbQuery = refFirebase.orderByChild(Constants.SEARCH_COLUMN);
+            mAdapter = new ContatoFBAdapter(this, fbQuery);
         }else {
-            Query fbQuery = null;
+            Query fbQuery = refFirebase.orderByChild(Constants.SEARCH_COLUMN).startAt(query).endAt(query+"\uf8ff");
             mAdapter = new ContatoFBAdapter(this,fbQuery);
         }
         list.setAdapter(mAdapter);
     }
 
+    //Preeche lista da tela
+    protected void buildListView() {
+        Query fbQuery = refFirebase.orderByChild(Constants.SEARCH_COLUMN);
+        mAdapter = new ContatoFBAdapter(this, fbQuery);
+        //mAdapter = new ContatoFBAdapter(this, refFirebase);
+        list.setAdapter(mAdapter);
+    }
+
+    // Gera informacoes iniciais para o App em testes
     private void startContactList () {
+        //Teste utilizando contatos do telefone hospedeiro
         Iterator<FBContato> listIterator = provider.selecionaTodosContatosAparelho().iterator();
+        int quant = 0;
         while (listIterator.hasNext()) {
+            // fetch data
             FBContato contato = listIterator.next();
+            refFirebase.push().setValue(contato);
 
-            mFirebaseRef.push().setValue(contato);
-
+            quant++;
+            if (quant > 20) break;
         }
     }
 
+    //Verifica se e a primeira execucao do app
     public AppStart checkAppStart() {
         PackageInfo pInfo;
         SharedPreferences sharedPreferences = PreferenceManager
@@ -224,6 +235,7 @@ public class BaseActivity extends AppCompatActivity {
         return appStart;
     }
 
+    //Verifica a troca de versao do app
     public AppStart checkAppStart(int currentVersionCode, int lastVersionCode) {
         if (lastVersionCode == -1) {
             return AppStart.FIRST_TIME;

@@ -12,6 +12,7 @@ import java.util.List;
 
 /**
  * Created by LeonardoAlmeida on 11/12/15.
+ * Classe de atribuição de contatos
  */
 public class FBContato {
     private String  nome;
