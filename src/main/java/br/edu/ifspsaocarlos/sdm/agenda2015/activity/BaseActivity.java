@@ -6,13 +6,11 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.database.Cursor;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
-import android.net.Uri;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.provider.CallLog;
+import android.provider.ContactsContract;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.SearchView;
 import android.support.v7.widget.Toolbar;
@@ -29,18 +27,22 @@ import android.widget.Toast;
 import com.firebase.client.Firebase;
 import com.firebase.client.Query;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.Iterator;
+import java.util.Map;
 
 import br.edu.ifspsaocarlos.sdm.agenda2015.R;
 import br.edu.ifspsaocarlos.sdm.agenda2015.adapter.ContatoFBAdapter;
+import br.edu.ifspsaocarlos.sdm.agenda2015.adapter.FakerInterface;
+import br.edu.ifspsaocarlos.sdm.agenda2015.model.FBAtributo;
 import br.edu.ifspsaocarlos.sdm.agenda2015.model.FBContato;
 import br.edu.ifspsaocarlos.sdm.agenda2015.provider.EquipContatoProvider;
 import br.edu.ifspsaocarlos.sdm.agenda2015.utils.Constants;
+import br.edu.ifspsaocarlos.sdm.agenda2015.utils.FakerProvider;
 
 
-public class BaseActivity extends AppCompatActivity {
+public class BaseActivity extends AppCompatActivity implements FakerInterface {
 
     private static final String TAG = "BaseActivity";
 
@@ -66,9 +68,6 @@ public class BaseActivity extends AppCompatActivity {
 
 
         // Inicia lista com dados aleatorios para teste
-        //FBContato contato = FBContato.genFakeContact(this);
-        provider = new EquipContatoProvider(this);
-
         if (checkAppStart() == AppStart.FIRST_TIME) {
             startContactList();
         }
@@ -148,39 +147,6 @@ public class BaseActivity extends AppCompatActivity {
         list.setAdapter(mAdapter);
     }
 
-
-    // Gera informacoes iniciais para o App em testes
-    private void startContactList () {
-        //Teste utilizando contatos do telefone hospedeiro
-        Iterator<FBContato> listIterator = provider.selecionaTodosContatosAparelho().iterator();
-        while (listIterator.hasNext()) {
-            // fetch data
-            int quant = 0;
-            while (quant < 20) {
-                FBContato contato = listIterator.next();
-                refFirebase.push().setValue(contato);
-                quant++;
-            }
-        }
-
-        //Teste utilizando as informacoes coletadas do host faker
-        /*ConnectivityManager connMgr = (ConnectivityManager)
-                getSystemService(Context.CONNECTIVITY_SERVICE);
-        NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
-        if (networkInfo != null && networkInfo.isConnected()) {
-            // fetch data
-            int quant = 0;
-            while (quant<20) {
-                //FBContato contato = listIterator.next();
-                refFirebase.push().setValue(FBContato.genFakeContact(this));
-                quant++;
-            }
-        } else {
-            String msg = "Sem conexão com a internet";
-            Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_SHORT).show();
-        }*/
-    }
-
     //Verifica se e a primeira execucao do app
     public AppStart checkAppStart() {
         PackageInfo pInfo;
@@ -217,6 +183,70 @@ public class BaseActivity extends AppCompatActivity {
             return AppStart.NORMAL;
         } else {
             return AppStart.NORMAL;
+        }
+    }
+
+
+    // Testa conectividade com a internet e
+    // Gera informacoes iniciais para o App invocando o Faker
+    private void startContactList () {
+
+        //Teste utilizando as informacoes coletadas do host faker
+        ConnectivityManager connMgr = (ConnectivityManager)
+                getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
+
+        if (networkInfo != null && networkInfo.isConnected()) {
+            // fetch data
+            int quant = 0;
+            while (quant<5) {
+
+                new FakerProvider(this, this).execute(FakerProvider.PROPERTY.FINDNAME.toString(),
+                        FakerProvider.PROPERTY.PAST.toString(),
+                        FakerProvider.PROPERTY.AVATAR.toString(),
+                        FakerProvider.PROPERTY.PHONENUMBER.toString(),
+                        FakerProvider.PROPERTY.EMAIL.toString());
+
+                quant++;
+            }
+
+        } else {
+            String msg = "Sem conexão com a internet";
+            Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    //Interface de retorno do Faker
+    public void fakeContactResponse( Map<String,String> parametros ){
+        if (parametros.size() > 0) {
+            FBContato contato = new FBContato();
+            contato.setNome(parametros.get(FakerProvider.PROPERTY.FINDNAME.toString()));
+            try {
+                String date_s = parametros.get(FakerProvider.PROPERTY.PAST.toString());
+                SimpleDateFormat dt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+                Date date = dt.parse(date_s);
+                long milisecs = date.getTime() / 1000;
+                contato.setDtNasc(milisecs);
+            } catch (ParseException e) {
+                e.printStackTrace();
+            }
+            contato.setThumb_foto(parametros.get(FakerProvider.PROPERTY.AVATAR.toString()));
+
+            FBAtributo atributo = new FBAtributo();
+            atributo.setAttrType(0);
+            atributo.setAttrValue(parametros.get(FakerProvider.PROPERTY.PHONENUMBER.toString()));
+            atributo.setAttrLabel(Constants.TYPE_FONE);
+            atributo.setContentItemType(ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE);
+            contato.addAttr(atributo);
+
+            atributo = new FBAtributo();
+            atributo.setAttrType(1);
+            atributo.setAttrValue(parametros.get(FakerProvider.PROPERTY.EMAIL.toString()));
+            atributo.setAttrLabel(Constants.TYPE_EMAIL);
+            atributo.setContentItemType(ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE);
+            contato.addAttr(atributo);
+
+            refFirebase.push().setValue(contato);
         }
     }
 

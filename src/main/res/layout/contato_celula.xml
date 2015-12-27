@@ -4,12 +4,14 @@
     android:layout_width="match_parent"
     android:layout_height="70dp">
 
+
     <ImageView
         android:id="@+id/thumbFoto"
         android:layout_width="70dp"
         android:layout_height="match_parent"
         android:scaleType="fitXY"
-        android:layout_margin="@dimen/cel_margin"/>
+        android:layout_margin="@dimen/cel_margin"
+        />
 
     <LinearLayout
         android:orientation="vertical"

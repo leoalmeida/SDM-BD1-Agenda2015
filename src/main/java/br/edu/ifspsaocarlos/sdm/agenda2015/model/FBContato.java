@@ -1,6 +1,5 @@
 package br.edu.ifspsaocarlos.sdm.agenda2015.model;
 
-import android.content.Context;
 import android.provider.ContactsContract;
 
 import java.text.ParseException;
@@ -10,13 +9,11 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 
-import br.edu.ifspsaocarlos.sdm.agenda2015.provider.ContactFakerProvider;
-import br.edu.ifspsaocarlos.sdm.agenda2015.utils.Constants;
-
 /**
  * Created by LeonardoAlmeida on 11/12/15.
  */
-public class FBContato {
+public class FBContato{
+
     private String  nome;
     private Long    dtNasc;
     private String  thumb_foto;
@@ -27,6 +24,8 @@ public class FBContato {
         return thumb_foto;
     }
 
+
+    //Getters and Setters
     public void setThumb_foto(String thumb_foto) {
         this.thumb_foto = thumb_foto;
     }
@@ -37,6 +36,23 @@ public class FBContato {
 
     public void setNome(String nome) {
         this.nome = nome;
+    }
+
+    public Long getDtNasc() {
+        return this.dtNasc;
+    }
+
+    public void setDtNasc(Long dtNasc) {
+        this.dtNasc = dtNasc;
+    }
+
+    public List<FBAtributo> getAtributos() { return atributos;}
+
+
+
+    //Outras operacoes
+    public void addAttr(FBAtributo atributo) {
+        this.atributos.add(atributo);
     }
 
     public void setFormattedDtNasc (String dtNasc){
@@ -51,43 +67,8 @@ public class FBContato {
 
     public String getFormattedDtNasc() {
         SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
-        return sdf.format(new Date(dtNasc));
-    }
 
-    public Long getDtNasc() {
-        return this.dtNasc;
-    }
-
-    public void setDtNasc(Long dtNasc) {
-        this.dtNasc = dtNasc;
-    }
-
-    public List<FBAtributo> getAtributos() { return atributos;}
-
-    public void setAtributos(List<FBAtributo> atributos) {
-        this.atributos = atributos;
-    }
-
-
-    public void addAttr(FBAtributo atributo) {
-        this.atributos.add(atributo);
-    }
-
-    public void updAttr(int attrID, FBAtributo atributo) {
-        this.atributos.set(attrID, atributo);
-    }
-
-    //public List<FBAtributo>  listaEmails() {return atributos;}
-
-    public static FBContato genFakeContact(Context context){
-        FBContato contact = new FBContato();
-        contact.setNome(ContactFakerProvider.generatePropertyValue(ContactFakerProvider.PROPERTY.FINDNAME, context));
-        contact.setFormattedDtNasc(ContactFakerProvider.generatePropertyValue(ContactFakerProvider.DATE.PAST, context));
-        contact.setThumb_foto(ContactFakerProvider.generatePropertyValue(ContactFakerProvider.INTERNET.AVATAR, context));
-        contact.addAttr(FBAtributo.genFakeAttr(Constants.TYPE_FONE, context));
-        contact.addAttr(FBAtributo.genFakeAttr(Constants.TYPE_EMAIL, context));
-
-        return contact;
+        return sdf.format(new Date(dtNasc*1000));
     }
 
     public String listaFones() {
@@ -104,7 +85,6 @@ public class FBContato {
 
         return retorno;
     }
-
 
     public String listaEmails() {
         Iterator<FBAtributo> iterator = atributos.listIterator();
